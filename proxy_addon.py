@@ -13,55 +13,59 @@ class BurpLiteAddon:
         self.pending = {}
         
         # Start background thread to poll for actions
-        self.should_poll = True  # Renamed from self.running
+        self.should_poll = True
         self.poll_thread = threading.Thread(target=self._poll_actions, daemon=True)
         self.poll_thread.start()
         
     def _poll_actions(self):
         """Poll server for forward/drop actions"""
         while self.should_poll:
-            try:
-                resp = requests.get(f"{API_URL}/actions", timeout=1)
-                actions = resp.json()
-                
-                for action in actions:
-                    req_id = action['id']
-                    action_type = action['action']
+            # Only poll if we have pending requests
+            if len(self.pending) > 0:
+                try:
+                    resp = requests.get(f"{API_URL}/actions", timeout=1)
+                    actions = resp.json()
                     
-                    if req_id in self.pending:
-                        flow = self.pending[req_id]
+                    for action in actions:
+                        req_id = action['id']
+                        action_type = action['action']
                         
-                        if action_type == 'forward':
-                            print(f">>> FORWARDING: {req_id}")
+                        if req_id in self.pending:
+                            flow = self.pending[req_id]
                             
-                            # Apply modifications if present
-                            if 'modified' in action:
-                                mod = action['modified']
-                                flow.request.method = mod.get('method', flow.request.method)
-                                flow.request.path = mod.get('path', flow.request.path)
+                            if action_type == 'forward':
+                                print(f">>> FORWARDING: {req_id}")
                                 
-                                # Update headers
-                                if 'headers' in mod:
-                                    flow.request.headers.clear()
-                                    for k, v in mod['headers'].items():
-                                        flow.request.headers[k] = v
+                                # Apply modifications if present
+                                if 'modified' in action:
+                                    mod = action['modified']
+                                    flow.request.method = mod.get('method', flow.request.method)
+                                    flow.request.path = mod.get('path', flow.request.path)
+                                    
+                                    # Update headers
+                                    if 'headers' in mod:
+                                        flow.request.headers.clear()
+                                        for k, v in mod['headers'].items():
+                                            flow.request.headers[k] = v
+                                    
+                                    # Update body
+                                    if 'body' in mod:
+                                        flow.request.content = mod['body'].encode('utf-8')
                                 
-                                # Update body
-                                if 'body' in mod:
-                                    flow.request.content = mod['body'].encode('utf-8')
-                            
-                            flow.resume()
-                            del self.pending[req_id]
-                            
-                        elif action_type == 'drop':
-                            print(f">>> DROPPING: {req_id}")
-                            flow.kill()
-                            del self.pending[req_id]
+                                flow.resume()
+                                del self.pending[req_id]
+                                
+                            elif action_type == 'drop':
+                                print(f">>> DROPPING: {req_id}")
+                                flow.kill()
+                                del self.pending[req_id]
+                    
+                except Exception as e:
+                    pass
                 
-            except Exception as e:
-                pass
-            
-            time.sleep(0.2)  # Poll every 200ms
+                time.sleep(0.3)  # Poll every 300ms when there are pending requests
+            else:
+                time.sleep(1)  # Sleep longer when idle
         
     def request(self, flow: http.HTTPFlow):
         print(f">>> REQUEST: {flow.request.method} {flow.request.pretty_url}")

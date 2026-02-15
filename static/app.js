@@ -176,21 +176,162 @@ function parseRequest(text) {
     return { method, url, headers, body: body.trim() };
 }
 
+let currentResponseMode = 'raw';
+let lastResponseData = null;
+
+// Add this near the bottom, before connectWebSocket()
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        currentResponseMode = mode;
+
+        // Update button states
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Re-render response in new mode
+        if (lastResponseData) {
+            displayResponse(lastResponseData);
+        }
+    });
+});
+
 function displayResponse(data) {
+    lastResponseData = data;
+
     if (data.error) {
         document.getElementById('responseStatus').innerHTML = `<span style="color:#e81123">Error: ${data.error}</span>`;
+        hideAllResponseViews();
         return;
     }
 
-    document.getElementById('responseStatus').innerHTML = `Status: <strong>${data.status_code}</strong>`;
+    document.getElementById('responseStatus').innerHTML = `Status: <strong style="color: ${getStatusColor(data.status_code)}">${data.status_code}</strong>`;
 
+    const rawText = document.getElementById('repeaterResponse');
+    const renderedFrame = document.getElementById('renderedResponse');
+    const prettyPre = document.getElementById('prettyResponse');
+
+    // Build raw response text
     let responseText = 'HTTP/1.1 ' + data.status_code + '\n';
     for (const [key, value] of Object.entries(data.headers)) {
         responseText += `${key}: ${value}\n`;
     }
     responseText += '\n' + data.body;
 
-    document.getElementById('repeaterResponse').value = responseText;
+    rawText.value = responseText;
+
+    // Show appropriate view based on mode
+    hideAllResponseViews();
+
+    if (currentResponseMode === 'raw') {
+        rawText.style.display = 'block';
+    } else if (currentResponseMode === 'rendered') {
+        renderedFrame.style.display = 'block';
+        const blob = new Blob([data.body], { type: 'text/html' });
+        renderedFrame.src = URL.createObjectURL(blob);
+    } else if (currentResponseMode === 'pretty') {
+        prettyPre.style.display = 'block';
+
+        // Try to detect and format content
+        const contentType = data.headers['Content-Type'] || data.headers['content-type'] || '';
+
+        if (contentType.includes('application/json') || isJSON(data.body)) {
+            prettyPre.innerHTML = syntaxHighlightJSON(data.body);
+        } else if (contentType.includes('text/html') || contentType.includes('text/xml')) {
+            prettyPre.innerHTML = `<code>${escapeHtml(formatXML(data.body))}</code>`;
+        } else {
+            prettyPre.textContent = data.body;
+        }
+    }
+}
+
+function hideAllResponseViews() {
+    document.getElementById('repeaterResponse').style.display = 'none';
+    document.getElementById('renderedResponse').style.display = 'none';
+    document.getElementById('prettyResponse').style.display = 'none';
+}
+
+function getStatusColor(status) {
+    if (status >= 200 && status < 300) return '#3fb950';
+    if (status >= 300 && status < 400) return '#58a6ff';
+    if (status >= 400 && status < 500) return '#d29922';
+    if (status >= 500) return '#f85149';
+    return '#8b949e';
+}
+
+function isJSON(str) {
+    try {
+        JSON.parse(str);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function syntaxHighlightJSON(json) {
+    try {
+        const obj = JSON.parse(json);
+        const pretty = JSON.stringify(obj, null, 2);
+
+        return pretty
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+    } catch (e) {
+        return escapeHtml(json);
+    }
+}
+
+function formatXML(xml) {
+    const PADDING = '  ';
+    const reg = /(>)(<)(\/*)/g;
+    let formatted = '';
+    let pad = 0;
+
+    xml = xml.replace(reg, '$1\n$2$3');
+    xml.split('\n').forEach((node) => {
+        let indent = 0;
+        if (node.match(/.+<\/\w[^>]*>$/)) {
+            indent = 0;
+        } else if (node.match(/^<\/\w/)) {
+            if (pad !== 0) {
+                pad -= 1;
+            }
+        } else if (node.match(/^<\w([^>]*[^\/])?>.*$/)) {
+            indent = 1;
+        }
+
+        formatted += PADDING.repeat(pad) + node + '\n';
+        pad += indent;
+    });
+
+    return formatted.trim();
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
 }
 
 // Tab switching

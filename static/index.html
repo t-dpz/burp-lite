@@ -49,9 +49,19 @@
                     <button id="sendRequest" class="btn btn-primary">Send</button>
                 </div>
                 <div class="response-viewer">
-                    <h3>Response</h3>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
+                        <h3 style="margin: 0; padding: 0;">Response</h3>
+                        <div class="response-mode-toggle">
+                            <button class="mode-btn active" data-mode="raw">Raw</button>
+                            <button class="mode-btn" data-mode="pretty">Pretty</button>
+                            <button class="mode-btn" data-mode="rendered">Rendered</button>
+                        </div>
+                    </div>
                     <div id="responseStatus"></div>
                     <textarea id="repeaterResponse" readonly></textarea>
+                    <iframe id="renderedResponse" style="display: none;"></iframe>
+                    <pre id="prettyResponse" style="display: none;"></pre>
                 </div>
             </div>
         </div>

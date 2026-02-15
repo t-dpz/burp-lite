@@ -1,29 +1,54 @@
 from mitmproxy import http
 import json
-import asyncio
 from datetime import datetime
+import os
+
+INTERCEPT_QUEUE_FILE = '/tmp/burp_lite_queue.json'
+INTERCEPT_STATE_FILE = '/tmp/burp_lite_state.json'
 
 class BurpLiteAddon:
     def __init__(self):
-        self.intercepted = []
-        self.pending = []
-        self.intercept_enabled = False
-        self.websocket_clients = []
+        self.pending = {}
+        # Initialize state file
+        with open(INTERCEPT_STATE_FILE, 'w') as f:
+            json.dump({'enabled': False}, f)
         
     def request(self, flow: http.HTTPFlow):
-        if self.intercept_enabled:
-            # Store intercepted request
+        # Check if intercept is enabled
+        try:
+            with open(INTERCEPT_STATE_FILE, 'r') as f:
+                state = json.load(f)
+                intercept_enabled = state.get('enabled', False)
+        except:
+            intercept_enabled = False
+        
+        print(f"[PROXY] {flow.request.method} {flow.request.pretty_url} | Intercept: {intercept_enabled}")
+        
+        if intercept_enabled:
             req_data = self._serialize_request(flow)
-            req_data['id'] = id(flow)
+            req_id = str(id(flow))
+            req_data['id'] = req_id
             req_data['timestamp'] = datetime.now().isoformat()
             
-            self.pending.append({
-                'flow': flow,
-                'data': req_data
-            })
+            # Write to queue file
+            try:
+                if os.path.exists(INTERCEPT_QUEUE_FILE):
+                    with open(INTERCEPT_QUEUE_FILE, 'r') as f:
+                        queue = json.load(f)
+                else:
+                    queue = []
+                
+                queue.append(req_data)
+                
+                with open(INTERCEPT_QUEUE_FILE, 'w') as f:
+                    json.dump(queue, f)
+                    
+                print(f"[INTERCEPT] Added to queue: {req_data['method']} {req_data['url']}")
+            except Exception as e:
+                print(f"[ERROR] Failed to write queue: {e}")
             
-            # Notify WebSocket clients
-            asyncio.create_task(self._notify_clients(req_data))
+            # Store flow for later
+            self.pending[req_id] = flow
             
             # Pause the flow
             flow.intercept()
@@ -39,24 +64,5 @@ class BurpLiteAddon:
             'scheme': flow.request.scheme,
             'port': flow.request.port,
         }
-    
-    def _serialize_response(self, flow: http.HTTPFlow):
-        if not flow.response:
-            return None
-        return {
-            'status_code': flow.response.status_code,
-            'headers': dict(flow.response.headers),
-            'body': flow.response.content.decode('utf-8', errors='replace') if flow.response.content else '',
-        }
-    
-    async def _notify_clients(self, data):
-        for client in self.websocket_clients:
-            try:
-                await client.send_json({
-                    'type': 'intercepted',
-                    'data': data
-                })
-            except:
-                pass
 
 addons = [BurpLiteAddon()]

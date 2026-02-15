@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Burp Lite 1.0 (c) -=tdpz=-</h1>
+            <h1>Burp Lite <span class="white">-=tdpz=-</span></h1>
             <div class="controls">
                 <button id="toggleIntercept" class="btn">Intercept: OFF</button>
                 <button id="scopeSettings" class="btn">⚙️ Scope</button>
@@ -20,6 +20,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="intercept">Intercept</button>
             <button class="tab" data-tab="repeater">Repeater</button>
+            <button class="tab" data-tab="intruder">Intruder</button>
             <button class="tab" data-tab="encoder">Encoder</button>
         </div>
 
@@ -59,7 +60,19 @@
         <div id="repeater" class="panel">
             <div class="split-view">
                 <div class="request-editor">
-                    <h3>Request</h3>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color);">
+                        <h3 style="margin: 0;">Request</h3>
+                        <div class="export-dropdown">
+                            <button class="btn" id="exportBtn">📤 Export</button>
+                            <div class="export-menu" id="exportMenu">
+                                <button class="export-option" data-export="curl">Copy as cURL</button>
+                                <button class="export-option" data-export="python">Copy as Python</button>
+                                <button class="export-option" data-export="javascript">Copy as JavaScript</button>
+                                <button class="export-option" data-export="powershell">Copy as PowerShell</button>
+                            </div>
+                        </div>
+                    </div>
                     <textarea id="repeaterRequest" placeholder="Paste request here..."></textarea>
                     <button id="sendRequest" class="btn btn-primary">Send</button>
                 </div>
@@ -77,6 +90,86 @@
                     <textarea id="repeaterResponse" readonly></textarea>
                     <iframe id="renderedResponse" style="display: none;"></iframe>
                     <pre id="prettyResponse" style="display: none;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Intruder Panel -->
+        <div id="intruder" class="panel">
+            <div class="intruder-container">
+                <div class="intruder-request">
+                    <h3>Request Template</h3>
+                    <div class="intruder-help">
+                        Mark injection points with <code>§param§</code> - Example:
+                        <code>username=§admin§&password=§pass§</code>
+                    </div>
+                    <textarea id="intruderRequest"
+                        placeholder="Paste request here and mark injection points with §...§"></textarea>
+
+                    <div class="intruder-config">
+                        <div class="config-row">
+                            <label>Attack Type:</label>
+                            <select id="attackType">
+                                <option value="sniper">Sniper (one position at a time)</option>
+                                <option value="battering-ram">Battering Ram (all positions same payload)</option>
+                            </select>
+                        </div>
+
+                        <div class="config-row">
+                            <label>Payloads:</label>
+                            <div class="payload-options">
+                                <button class="btn" id="loadWordlist">📁 Load File</button>
+                                <input type="file" id="wordlistFile" style="display: none;" accept=".txt">
+                                <span id="payloadCount">0 payloads loaded</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <textarea id="payloadList" placeholder="Or paste payloads here (one per line)..."></textarea>
+
+                    <button id="startAttack" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">🚀 Start
+                        Attack</button>
+                    <button id="stopAttack" class="btn btn-danger"
+                        style="width: 100%; margin-top: 0.5rem; display: none;">⏹ Stop Attack</button>
+                </div>
+
+                <div class="intruder-results">
+                    <div class="results-header">
+                        <h3>Results</h3>
+                        <div class="results-stats" id="intruderStats">Ready</div>
+                    </div>
+                    <div class="results-table">
+                        <table id="intruderTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Payload</th>
+                                    <th>Status</th>
+                                    <th>Length</th>
+                                    <th>Time (ms)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="intruderResults">
+                                <tr class="empty-state">
+                                    <td colspan="6">No results yet - configure and start an attack</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response viewer modal -->
+            <div id="intruderResponseModal" class="modal">
+                <div class="modal-content" style="max-width: 900px;">
+                    <div class="modal-header">
+                        <h2>Response Details</h2>
+                        <button class="close-intruder-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="intruderResponseContent"></div>
+                    </div>
                 </div>
             </div>
         </div>

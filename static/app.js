@@ -441,6 +441,144 @@ document.querySelectorAll('.tab').forEach(tab => {
         document.getElementById(tabName).classList.add('active');
     });
 });
+// Export functionality
+document.getElementById('exportBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('exportMenu');
+    menu.classList.toggle('show');
+});
+
+// Close export menu when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.export-dropdown')) {
+        document.getElementById('exportMenu').classList.remove('show');
+    }
+});
+
+document.querySelectorAll('.export-option').forEach(option => {
+    option.addEventListener('click', () => {
+        const format = option.dataset.export;
+        const requestText = document.getElementById('repeaterRequest').value;
+
+        if (!requestText.trim()) {
+            alert('No request to export!');
+            return;
+        }
+
+        const parsed = parseRequest(requestText);
+        let exported = '';
+
+        switch (format) {
+            case 'curl':
+                exported = exportToCurl(parsed);
+                break;
+            case 'python':
+                exported = exportToPython(parsed);
+                break;
+            case 'javascript':
+                exported = exportToJavaScript(parsed);
+                break;
+            case 'powershell':
+                exported = exportToPowerShell(parsed);
+                break;
+        }
+
+        navigator.clipboard.writeText(exported).then(() => {
+            const originalText = option.textContent;
+            option.textContent = '✓ Copied!';
+            setTimeout(() => {
+                option.textContent = originalText;
+            }, 2000);
+        });
+
+        document.getElementById('exportMenu').classList.remove('show');
+    });
+});
+
+function exportToCurl(req) {
+    let curl = `curl -X ${req.method} '${req.url}'`;
+
+    for (const [key, value] of Object.entries(req.headers)) {
+        curl += ` \\\n  -H '${key}: ${value}'`;
+    }
+
+    if (req.body) {
+        curl += ` \\\n  -d '${req.body.replace(/'/g, "\\'")}'`;
+    }
+
+    return curl;
+}
+
+function exportToPython(req) {
+    const urlObj = new URL(req.url);
+
+    let python = `import requests\n\n`;
+    python += `url = "${req.url}"\n\n`;
+    python += `headers = {\n`;
+
+    for (const [key, value] of Object.entries(req.headers)) {
+        python += `    "${key}": "${value}",\n`;
+    }
+    python += `}\n\n`;
+
+    if (req.body) {
+        python += `data = """${req.body}"""\n\n`;
+        python += `response = requests.${req.method.toLowerCase()}(url, headers=headers, data=data)\n`;
+    } else {
+        python += `response = requests.${req.method.toLowerCase()}(url, headers=headers)\n`;
+    }
+
+    python += `\nprint(f"Status: {response.status_code}")\n`;
+    python += `print(response.text)`;
+
+    return python;
+}
+
+function exportToJavaScript(req) {
+    let js = `const url = "${req.url}";\n\n`;
+    js += `const options = {\n`;
+    js += `  method: "${req.method}",\n`;
+    js += `  headers: {\n`;
+
+    for (const [key, value] of Object.entries(req.headers)) {
+        js += `    "${key}": "${value}",\n`;
+    }
+    js += `  }`;
+
+    if (req.body) {
+        js += `,\n  body: ${JSON.stringify(req.body)}`;
+    }
+
+    js += `\n};\n\n`;
+    js += `fetch(url, options)\n`;
+    js += `  .then(response => response.text())\n`;
+    js += `  .then(data => console.log(data))\n`;
+    js += `  .catch(error => console.error('Error:', error));`;
+
+    return js;
+}
+
+function exportToPowerShell(req) {
+    let ps = `$url = "${req.url}"\n\n`;
+    ps += `$headers = @{\n`;
+
+    for (const [key, value] of Object.entries(req.headers)) {
+        ps += `    "${key}" = "${value}"\n`;
+    }
+    ps += `}\n\n`;
+
+    if (req.body) {
+        ps += `$body = @"\n${req.body}\n"@\n\n`;
+        ps += `$response = Invoke-WebRequest -Uri $url -Method ${req.method} -Headers $headers -Body $body\n`;
+    } else {
+        ps += `$response = Invoke-WebRequest -Uri $url -Method ${req.method} -Headers $headers\n`;
+    }
+
+    ps += `\nWrite-Host "Status: $($response.StatusCode)"\n`;
+    ps += `Write-Host $response.Content`;
+
+    return ps;
+}
 // Encoder functionality
 document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -900,5 +1038,230 @@ function handleWebSocketMessage(data) {
 
 // Load scope on startup
 loadScope();
+
+// Intruder functionality
+let intruderRunning = false;
+let intruderResults = [];
+let currentAttackIndex = 0;
+
+document.getElementById('loadWordlist').addEventListener('click', () => {
+    document.getElementById('wordlistFile').click();
+});
+
+document.getElementById('wordlistFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            document.getElementById('payloadList').value = event.target.result;
+            updatePayloadCount();
+        };
+        reader.readAsText(file);
+    }
+});
+
+document.getElementById('payloadList').addEventListener('input', updatePayloadCount);
+
+function updatePayloadCount() {
+    const payloads = getPayloads();
+    document.getElementById('payloadCount').textContent = `${payloads.length} payloads loaded`;
+}
+
+function getPayloads() {
+    return document.getElementById('payloadList').value
+        .split('\n')
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+}
+
+function findInjectionPoints(template) {
+    const regex = /§([^§]+)§/g;
+    const points = [];
+    let match;
+
+    while ((match = regex.exec(template)) !== null) {
+        points.push({
+            placeholder: match[0],
+            value: match[1],
+            index: match.index
+        });
+    }
+
+    return points;
+}
+
+document.getElementById('startAttack').addEventListener('click', async () => {
+    const template = document.getElementById('intruderRequest').value;
+    const payloads = getPayloads();
+    const attackType = document.getElementById('attackType').value;
+
+    if (!template.includes('§')) {
+        alert('Please mark at least one injection point with §...§');
+        return;
+    }
+
+    if (payloads.length === 0) {
+        alert('Please add some payloads!');
+        return;
+    }
+
+    // Clear previous results
+    intruderResults = [];
+    currentAttackIndex = 0;
+    document.getElementById('intruderResults').innerHTML = '';
+
+    // Start attack
+    intruderRunning = true;
+    document.getElementById('startAttack').style.display = 'none';
+    document.getElementById('stopAttack').style.display = 'block';
+    document.getElementById('intruderStats').classList.add('running');
+
+    const injectionPoints = findInjectionPoints(template);
+
+    for (let i = 0; i < payloads.length && intruderRunning; i++) {
+        currentAttackIndex = i + 1;
+        updateIntruderStats(currentAttackIndex, payloads.length);
+
+        let modifiedRequest = template;
+
+        if (attackType === 'sniper') {
+            // Sniper: only replace first injection point
+            modifiedRequest = template.replace(injectionPoints[0].placeholder, payloads[i]);
+        } else {
+            // Battering ram: replace all injection points with same payload
+            injectionPoints.forEach(point => {
+                modifiedRequest = modifiedRequest.replace(point.placeholder, payloads[i]);
+            });
+        }
+
+        await sendIntruderRequest(modifiedRequest, payloads[i], i + 1);
+
+        // Small delay to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    stopIntruder();
+});
+
+document.getElementById('stopAttack').addEventListener('click', stopIntruder);
+
+function stopIntruder() {
+    intruderRunning = false;
+    document.getElementById('startAttack').style.display = 'block';
+    document.getElementById('stopAttack').style.display = 'none';
+    document.getElementById('intruderStats').classList.remove('running');
+    updateIntruderStats(currentAttackIndex, getPayloads().length, true);
+}
+
+function updateIntruderStats(current, total, complete = false) {
+    const stats = document.getElementById('intruderStats');
+    if (complete) {
+        stats.textContent = `Complete: ${current}/${total} requests`;
+    } else {
+        stats.textContent = `Running: ${current}/${total} requests`;
+    }
+}
+
+async function sendIntruderRequest(requestText, payload, index) {
+    const startTime = performance.now();
+
+    try {
+        const parsed = parseRequest(requestText);
+
+        const response = await fetch('/api/repeater/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(parsed)
+        });
+
+        const data = await response.json();
+        const endTime = performance.now();
+        const duration = Math.round(endTime - startTime);
+
+        const result = {
+            index,
+            payload,
+            status: data.status_code || 'Error',
+            length: data.body ? data.body.length : 0,
+            time: duration,
+            response: data
+        };
+
+        intruderResults.push(result);
+        addIntruderResult(result);
+    } catch (error) {
+        const endTime = performance.now();
+        const duration = Math.round(endTime - startTime);
+
+        const result = {
+            index,
+            payload,
+            status: 'Error',
+            length: 0,
+            time: duration,
+            error: error.message
+        };
+
+        intruderResults.push(result);
+        addIntruderResult(result);
+    }
+}
+
+function addIntruderResult(result) {
+    const tbody = document.getElementById('intruderResults');
+
+    // Remove empty state if present
+    const emptyState = tbody.querySelector('.empty-state');
+    if (emptyState) {
+        emptyState.remove();
+    }
+
+    const statusClass = result.status >= 200 && result.status < 300 ? 'status-2xx' :
+        result.status >= 300 && result.status < 400 ? 'status-3xx' :
+            result.status >= 400 && result.status < 500 ? 'status-4xx' :
+                result.status >= 500 ? 'status-5xx' : '';
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>${result.index}</td>
+        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(result.payload)}">${escapeHtml(result.payload)}</td>
+        <td><span class="status-badge ${statusClass}">${result.status}</span></td>
+        <td>${result.length.toLocaleString()}</td>
+        <td>${result.time}</td>
+        <td><button class="view-response-btn" onclick="viewIntruderResponse(${result.index - 1})">View</button></td>
+    `;
+
+    tbody.appendChild(row);
+
+    // Auto-scroll to bottom
+    tbody.parentElement.scrollTop = tbody.parentElement.scrollHeight;
+}
+
+function viewIntruderResponse(index) {
+    const result = intruderResults[index];
+    const modal = document.getElementById('intruderResponseModal');
+    const content = document.getElementById('intruderResponseContent');
+
+    let responseText = `Payload: ${result.payload}\n`;
+    responseText += `Status: ${result.status}\n`;
+    responseText += `Length: ${result.length} bytes\n`;
+    responseText += `Time: ${result.time}ms\n\n`;
+    responseText += `--- Response Body ---\n`;
+    responseText += result.response.body || result.error || 'No response body';
+
+    content.textContent = responseText;
+    modal.classList.add('show');
+}
+
+document.querySelector('.close-intruder-modal').addEventListener('click', () => {
+    document.getElementById('intruderResponseModal').classList.remove('show');
+});
+
+document.getElementById('intruderResponseModal').addEventListener('click', (e) => {
+    if (e.target.id === 'intruderResponseModal') {
+        document.getElementById('intruderResponseModal').classList.remove('show');
+    }
+});
+
 // Initialize
 connectWebSocket();

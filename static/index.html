@@ -9,9 +9,10 @@
 <body>
     <div class="container">
         <header>
-            <h1>Burp Lite</h1>
+            <h1>Burp Lite 1.0 (c) -=tdpz=-</h1>
             <div class="controls">
                 <button id="toggleIntercept" class="btn">Intercept: OFF</button>
+                <button id="scopeSettings" class="btn">⚙️ Scope</button>
                 <span class="proxy-info">Proxy: localhost:8081</span>
             </div>
         </header>
@@ -77,7 +78,7 @@
 
                 <div class="encoder-tools">
                     <div class="tool-group">
-                        <h4>Text Encoding</h4>
+                        <h4>🔤 Text Encoding</h4>
                         <div class="tool-buttons">
                             <button class="tool-btn" data-action="base64-encode">Base64 Encode</button>
                             <button class="tool-btn" data-action="base64-decode">Base64 Decode</button>
@@ -91,7 +92,7 @@
                     </div>
 
                     <div class="tool-group">
-                        <h4>Hashing</h4>
+                        <h4>🔐 Hashing</h4>
                         <div class="tool-buttons">
                             <button class="tool-btn" data-action="md5">MD5</button>
                             <button class="tool-btn" data-action="sha1">SHA1</button>
@@ -100,7 +101,7 @@
                     </div>
 
                     <div class="tool-group">
-                        <h4>Utilities</h4>
+                        <h4>🎯 Utilities</h4>
                         <div class="tool-buttons">
                             <button class="tool-btn" data-action="reverse">Reverse</button>
                             <button class="tool-btn" data-action="uppercase">UPPERCASE</button>
@@ -119,6 +120,64 @@
                     </div>
                     <textarea id="encoderOutput" readonly placeholder="Output will appear here..."></textarea>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scope Settings Modal -->
+    <div id="scopeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎯 Scope Settings</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="scope-section">
+                    <div class="scope-header">
+                        <h3>Include in Scope</h3>
+                        <div class="scope-presets">
+                            <button class="preset-btn" data-preset="htb">HTB Box</button>
+                            <button class="preset-btn" data-preset="local">Local Network</button>
+                            <button class="preset-btn" data-preset="all">All Traffic</button>
+                        </div>
+                    </div>
+                    <textarea id="includeScope"
+                        placeholder="One pattern per line. Examples:&#10;*.htb&#10;10.10.10.*&#10;192.168.*.*&#10;example.com"></textarea>
+                </div>
+
+                <div class="scope-section">
+                    <h3>Exclude from Scope</h3>
+                    <textarea id="excludeScope"
+                        placeholder="One pattern per line. Examples:&#10;*.google.com&#10;*.cloudflare.com&#10;cdn.*"></textarea>
+                </div>
+
+                <div class="scope-section">
+                    <h3>File Extension Filters</h3>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="excludeImages" checked> Exclude Images (.jpg, .png, .gif,
+                            .webp, .svg, .ico)</label>
+                        <label><input type="checkbox" id="excludeCSS" checked> Exclude Stylesheets (.css)</label>
+                        <label><input type="checkbox" id="excludeJS" checked> Exclude Scripts (.js)</label>
+                        <label><input type="checkbox" id="excludeFonts" checked> Exclude Fonts (.woff, .woff2, .ttf,
+                            .eot)</label>
+                        <label><input type="checkbox" id="excludeMedia" checked> Exclude Media (.mp4, .mp3, .avi,
+                            .mov)</label>
+                    </div>
+                </div>
+
+                <div class="scope-info">
+                    <strong>ℹ️ Tips:</strong>
+                    <ul>
+                        <li>Use <code>*</code> as wildcard (e.g., <code>*.htb</code> matches all .htb domains)</li>
+                        <li>Patterns are case-insensitive</li>
+                        <li>Include rules are checked first, then exclude rules</li>
+                        <li>If include list is empty, all hosts are included by default</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveScope" class="btn btn-primary">Save Scope</button>
+                <button id="clearScope" class="btn">Clear All</button>
             </div>
         </div>
     </div>

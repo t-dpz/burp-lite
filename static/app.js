@@ -603,5 +603,205 @@ function md5(string) {
 
     return wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d);
 }
+// Scope Management
+let scopeConfig = {
+    include: [],
+    exclude: [],
+    excludeImages: true,
+    excludeCSS: true,
+    excludeJS: true,
+    excludeFonts: true,
+    excludeMedia: true
+};
+
+// Load scope from localStorage
+function loadScope() {
+    const saved = localStorage.getItem('burp_lite_scope');
+    if (saved) {
+        scopeConfig = JSON.parse(saved);
+        applyScope();
+    }
+}
+
+function saveScope() {
+    localStorage.setItem('burp_lite_scope', JSON.stringify(scopeConfig));
+}
+
+function applyScope() {
+    document.getElementById('includeScope').value = scopeConfig.include.join('\n');
+    document.getElementById('excludeScope').value = scopeConfig.exclude.join('\n');
+    document.getElementById('excludeImages').checked = scopeConfig.excludeImages;
+    document.getElementById('excludeCSS').checked = scopeConfig.excludeCSS;
+    document.getElementById('excludeJS').checked = scopeConfig.excludeJS;
+    document.getElementById('excludeFonts').checked = scopeConfig.excludeFonts;
+    document.getElementById('excludeMedia').checked = scopeConfig.excludeMedia;
+}
+
+function matchesPattern(str, pattern) {
+    // Convert wildcard pattern to regex
+    const regexPattern = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // Escape special chars except *
+        .replace(/\*/g, '.*');  // Convert * to .*
+
+    const regex = new RegExp('^' + regexPattern + '$', 'i');
+    return regex.test(str);
+}
+
+function isInScope(url) {
+    try {
+        const urlObj = new URL(url);
+        const host = urlObj.hostname;
+        const path = urlObj.pathname;
+
+        // Check file extensions
+        const fileExcludeRules = [];
+        if (scopeConfig.excludeImages) {
+            fileExcludeRules.push(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i);
+        }
+        if (scopeConfig.excludeCSS) {
+            fileExcludeRules.push(/\.css$/i);
+        }
+        if (scopeConfig.excludeJS) {
+            fileExcludeRules.push(/\.js$/i);
+        }
+        if (scopeConfig.excludeFonts) {
+            fileExcludeRules.push(/\.(woff|woff2|ttf|eot)$/i);
+        }
+        if (scopeConfig.excludeMedia) {
+            fileExcludeRules.push(/\.(mp4|mp3|avi|mov|webm)$/i);
+        }
+
+        for (const rule of fileExcludeRules) {
+            if (rule.test(path)) {
+                return false;
+            }
+        }
+
+        // Check exclude patterns
+        for (const pattern of scopeConfig.exclude) {
+            if (pattern.trim() && matchesPattern(host, pattern.trim())) {
+                return false;
+            }
+        }
+
+        // Check include patterns (if any)
+        if (scopeConfig.include.length > 0) {
+            let included = false;
+            for (const pattern of scopeConfig.include) {
+                if (pattern.trim() && matchesPattern(host, pattern.trim())) {
+                    included = true;
+                    break;
+                }
+            }
+            return included;
+        }
+
+        // If no include patterns, include by default
+        return true;
+    } catch (e) {
+        return true;  // If URL parsing fails, include by default
+    }
+}
+
+// Modal controls
+document.getElementById('scopeSettings').addEventListener('click', () => {
+    document.getElementById('scopeModal').classList.add('show');
+});
+
+document.querySelector('.close-modal').addEventListener('click', () => {
+    document.getElementById('scopeModal').classList.remove('show');
+});
+
+document.getElementById('scopeModal').addEventListener('click', (e) => {
+    if (e.target.id === 'scopeModal') {
+        document.getElementById('scopeModal').classList.remove('show');
+    }
+});
+
+document.getElementById('saveScope').addEventListener('click', () => {
+    scopeConfig.include = document.getElementById('includeScope').value
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+    scopeConfig.exclude = document.getElementById('excludeScope').value
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+    scopeConfig.excludeImages = document.getElementById('excludeImages').checked;
+    scopeConfig.excludeCSS = document.getElementById('excludeCSS').checked;
+    scopeConfig.excludeJS = document.getElementById('excludeJS').checked;
+    scopeConfig.excludeFonts = document.getElementById('excludeFonts').checked;
+    scopeConfig.excludeMedia = document.getElementById('excludeMedia').checked;
+
+    saveScope();
+    document.getElementById('scopeModal').classList.remove('show');
+
+    console.log('[SCOPE] Saved:', scopeConfig);
+});
+
+document.getElementById('clearScope').addEventListener('click', () => {
+    scopeConfig = {
+        include: [],
+        exclude: [],
+        excludeImages: true,
+        excludeCSS: true,
+        excludeJS: true,
+        excludeFonts: true,
+        excludeMedia: true
+    };
+    applyScope();
+    saveScope();
+});
+
+// Preset buttons
+document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const preset = btn.dataset.preset;
+
+        if (preset === 'htb') {
+            document.getElementById('includeScope').value = '*.htb\n10.10.10.*\n10.10.11.*';
+            document.getElementById('excludeScope').value = '';
+        } else if (preset === 'local') {
+            document.getElementById('includeScope').value = '192.168.*.*\n10.*.*.*\n172.16.*.*';
+            document.getElementById('excludeScope').value = '';
+        } else if (preset === 'all') {
+            document.getElementById('includeScope').value = '';
+            document.getElementById('excludeScope').value = '';
+        }
+    });
+});
+
+// Update handleWebSocketMessage to filter by scope
+const originalHandleWebSocketMessage = handleWebSocketMessage;
+function handleWebSocketMessage(data) {
+    if (data.type === 'intercepted') {
+        // Check scope before adding
+        if (!isInScope(data.data.url)) {
+            console.log('[SCOPE] Filtered out:', data.data.url);
+            return;
+        }
+    }
+
+    // Call original handler
+    if (data.type === 'intercepted') {
+        interceptQueue.push(data.data);
+        renderInterceptQueue();
+    } else if (data.type === 'intercept_status') {
+        interceptEnabled = data.enabled;
+        updateInterceptButton();
+    } else if (data.type === 'removed') {
+        interceptQueue = interceptQueue.filter(r => r.id !== data.id);
+        renderInterceptQueue();
+        if (currentRequest && currentRequest.id === data.id) {
+            currentRequest = null;
+            document.getElementById('interceptRequest').value = '';
+        }
+    }
+}
+
+// Load scope on startup
+loadScope();
 // Initialize
 connectWebSocket();

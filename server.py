@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 import subprocess
 import threading
 import requests
@@ -17,7 +18,42 @@ class EndpointFilter(logging.Filter):
 # Add filter to uvicorn access logger
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
-app = FastAPI()
+# State management
+intercepted_requests: List[dict] = []
+pending_actions: List[dict] = []
+history: List[dict] = []
+intercept_enabled = False
+mitmproxy_process = None
+
+# WebSocket connections
+ws_clients: List[WebSocket] = []
+
+def start_mitmproxy():
+    global mitmproxy_process
+    
+    stdout_log = open('/tmp/mitmdump.log', 'w')
+    stderr_log = open('/tmp/mitmdump_error.log', 'w')
+    
+    mitmproxy_process = subprocess.Popen(
+        ['mitmdump', '-s', 'proxy_addon.py', '-p', '8081', '--listen-host', '0.0.0.0'],
+        stdout=stdout_log,
+        stderr=stderr_log
+    )
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("[SERVER] Starting mitmproxy - logs at /tmp/mitmdump.log")
+    thread = threading.Thread(target=start_mitmproxy, daemon=True)
+    thread.start()
+    
+    yield
+    
+    # Shutdown (if needed)
+    if mitmproxy_process:
+        mitmproxy_process.terminate()
+
+app = FastAPI(lifespan=lifespan)
 
 # State management
 intercepted_requests: List[dict] = []
@@ -42,19 +78,6 @@ class InterceptRequest(BaseModel):
     scheme: str
     port: int
     timestamp: str
-
-@app.on_event("startup")
-async def startup():
-    """Start mitmproxy in background"""
-    global mitmproxy_process
-    
-    # Open log files
-    stdout_log = open('/tmp/mitmdump.log', 'w')
-    stderr_log = open('/tmp/mitmdump_error.log', 'w')
-    
-    thread = threading.Thread(target=start_mitmproxy, daemon=True)
-    thread.start()
-    print("[SERVER] mitmproxy started - logs at /tmp/mitmdump.log")
 
 def start_mitmproxy():
     global mitmproxy_process

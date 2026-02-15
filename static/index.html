@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Burp Lite 1.0</h1>
+            <h1>Burp Lite</h1>
             <div class="controls">
                 <button id="toggleIntercept" class="btn">Intercept: OFF</button>
                 <span class="proxy-info">Proxy: localhost:8081</span>
@@ -19,6 +19,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="intercept">Intercept</button>
             <button class="tab" data-tab="repeater">Repeater</button>
+            <button class="tab" data-tab="encoder">Encoder</button>
         </div>
 
         <!-- Intercept Panel -->
@@ -62,6 +63,61 @@
                     <textarea id="repeaterResponse" readonly></textarea>
                     <iframe id="renderedResponse" style="display: none;"></iframe>
                     <pre id="prettyResponse" style="display: none;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Encoder Panel -->
+        <div id="encoder" class="panel">
+            <div class="encoder-container">
+                <div class="encoder-section">
+                    <h3>Input</h3>
+                    <textarea id="encoderInput" placeholder="Enter text to encode/decode..."></textarea>
+                </div>
+
+                <div class="encoder-tools">
+                    <div class="tool-group">
+                        <h4>Text Encoding</h4>
+                        <div class="tool-buttons">
+                            <button class="tool-btn" data-action="base64-encode">Base64 Encode</button>
+                            <button class="tool-btn" data-action="base64-decode">Base64 Decode</button>
+                            <button class="tool-btn" data-action="url-encode">URL Encode</button>
+                            <button class="tool-btn" data-action="url-decode">URL Decode</button>
+                            <button class="tool-btn" data-action="html-encode">HTML Encode</button>
+                            <button class="tool-btn" data-action="html-decode">HTML Decode</button>
+                            <button class="tool-btn" data-action="hex-encode">Hex Encode</button>
+                            <button class="tool-btn" data-action="hex-decode">Hex Decode</button>
+                        </div>
+                    </div>
+
+                    <div class="tool-group">
+                        <h4>Hashing</h4>
+                        <div class="tool-buttons">
+                            <button class="tool-btn" data-action="md5">MD5</button>
+                            <button class="tool-btn" data-action="sha1">SHA1</button>
+                            <button class="tool-btn" data-action="sha256">SHA256</button>
+                        </div>
+                    </div>
+
+                    <div class="tool-group">
+                        <h4>Utilities</h4>
+                        <div class="tool-buttons">
+                            <button class="tool-btn" data-action="reverse">Reverse</button>
+                            <button class="tool-btn" data-action="uppercase">UPPERCASE</button>
+                            <button class="tool-btn" data-action="lowercase">lowercase</button>
+                            <button class="tool-btn" data-action="jwt-decode">JWT Decode</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="encoder-section">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 style="margin: 0;">Output</h3>
+                        <button id="copyOutput" class="btn"
+                            style="padding: 0.375rem 0.875rem; font-size: 0.85rem;">Copy</button>
+                    </div>
+                    <textarea id="encoderOutput" readonly placeholder="Output will appear here..."></textarea>
                 </div>
             </div>
         </div>

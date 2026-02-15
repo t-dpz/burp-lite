@@ -344,6 +344,264 @@ document.querySelectorAll('.tab').forEach(tab => {
         document.getElementById(tabName).classList.add('active');
     });
 });
+// Encoder functionality
+document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        const input = document.getElementById('encoderInput').value;
+        const output = document.getElementById('encoderOutput');
 
+        try {
+            let result = '';
+
+            switch (action) {
+                case 'base64-encode':
+                    result = btoa(input);
+                    break;
+                case 'base64-decode':
+                    result = atob(input);
+                    break;
+                case 'url-encode':
+                    result = encodeURIComponent(input);
+                    break;
+                case 'url-decode':
+                    result = decodeURIComponent(input);
+                    break;
+                case 'html-encode':
+                    result = input.replace(/[&<>"']/g, m => ({
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#039;'
+                    })[m]);
+                    break;
+                case 'html-decode':
+                    const textarea = document.createElement('textarea');
+                    textarea.innerHTML = input;
+                    result = textarea.value;
+                    break;
+                case 'hex-encode':
+                    result = Array.from(input)
+                        .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+                        .join('');
+                    break;
+                case 'hex-decode':
+                    result = input.match(/.{1,2}/g)
+                        .map(byte => String.fromCharCode(parseInt(byte, 16)))
+                        .join('');
+                    break;
+                case 'md5':
+                    result = md5(input);
+                    break;
+                case 'sha1':
+                    result = sha1(input);
+                    break;
+                case 'sha256':
+                    result = sha256(input);
+                    break;
+                case 'reverse':
+                    result = input.split('').reverse().join('');
+                    break;
+                case 'uppercase':
+                    result = input.toUpperCase();
+                    break;
+                case 'lowercase':
+                    result = input.toLowerCase();
+                    break;
+                case 'jwt-decode':
+                    result = decodeJWT(input);
+                    break;
+                default:
+                    result = 'Unknown action';
+            }
+
+            output.value = result;
+        } catch (e) {
+            output.value = `Error: ${e.message}`;
+        }
+    });
+});
+
+document.getElementById('copyOutput').addEventListener('click', () => {
+    const output = document.getElementById('encoderOutput');
+    output.select();
+    document.execCommand('copy');
+
+    const btn = document.getElementById('copyOutput');
+    const originalText = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => {
+        btn.textContent = originalText;
+    }, 1500);
+});
+
+// JWT Decoder
+function decodeJWT(token) {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+        throw new Error('Invalid JWT format');
+    }
+
+    const header = JSON.parse(atob(parts[0]));
+    const payload = JSON.parse(atob(parts[1]));
+
+    return JSON.stringify({
+        header: header,
+        payload: payload,
+        signature: parts[2]
+    }, null, 2);
+}
+
+// Hash functions (using SubtleCrypto API)
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha1(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Simple MD5 implementation
+function md5(string) {
+    function rotateLeft(value, shift) {
+        return (value << shift) | (value >>> (32 - shift));
+    }
+
+    function addUnsigned(x, y) {
+        return (x + y) >>> 0;
+    }
+
+    function cmn(q, a, b, x, s, t) {
+        a = addUnsigned(addUnsigned(a, q), addUnsigned(x, t));
+        return addUnsigned(rotateLeft(a, s), b);
+    }
+
+    function ff(a, b, c, d, x, s, t) {
+        return cmn((b & c) | (~b & d), a, b, x, s, t);
+    }
+
+    function gg(a, b, c, d, x, s, t) {
+        return cmn((b & d) | (c & ~d), a, b, x, s, t);
+    }
+
+    function hh(a, b, c, d, x, s, t) {
+        return cmn(b ^ c ^ d, a, b, x, s, t);
+    }
+
+    function ii(a, b, c, d, x, s, t) {
+        return cmn(c ^ (b | ~d), a, b, x, s, t);
+    }
+
+    function convertToWordArray(string) {
+        let wordArray = [];
+        for (let i = 0; i < string.length * 8; i += 8) {
+            wordArray[i >> 5] |= (string.charCodeAt(i / 8) & 0xFF) << (i % 32);
+        }
+        return wordArray;
+    }
+
+    function wordToHex(value) {
+        let hex = '';
+        for (let i = 0; i < 4; i++) {
+            hex += ((value >> (i * 8 + 4)) & 0x0F).toString(16) +
+                ((value >> (i * 8)) & 0x0F).toString(16);
+        }
+        return hex;
+    }
+
+    const wordArray = convertToWordArray(string);
+    const wordCount = string.length * 8;
+
+    wordArray[wordCount >> 5] |= 0x80 << (wordCount % 32);
+    wordArray[(((wordCount + 64) >>> 9) << 4) + 14] = wordCount;
+
+    let a = 0x67452301, b = 0xEFCDAB89, c = 0x98BADCFE, d = 0x10325476;
+
+    for (let i = 0; i < wordArray.length; i += 16) {
+        const aa = a, bb = b, cc = c, dd = d;
+
+        a = ff(a, b, c, d, wordArray[i + 0], 7, 0xD76AA478);
+        d = ff(d, a, b, c, wordArray[i + 1], 12, 0xE8C7B756);
+        c = ff(c, d, a, b, wordArray[i + 2], 17, 0x242070DB);
+        b = ff(b, c, d, a, wordArray[i + 3], 22, 0xC1BDCEEE);
+        a = ff(a, b, c, d, wordArray[i + 4], 7, 0xF57C0FAF);
+        d = ff(d, a, b, c, wordArray[i + 5], 12, 0x4787C62A);
+        c = ff(c, d, a, b, wordArray[i + 6], 17, 0xA8304613);
+        b = ff(b, c, d, a, wordArray[i + 7], 22, 0xFD469501);
+        a = ff(a, b, c, d, wordArray[i + 8], 7, 0x698098D8);
+        d = ff(d, a, b, c, wordArray[i + 9], 12, 0x8B44F7AF);
+        c = ff(c, d, a, b, wordArray[i + 10], 17, 0xFFFF5BB1);
+        b = ff(b, c, d, a, wordArray[i + 11], 22, 0x895CD7BE);
+        a = ff(a, b, c, d, wordArray[i + 12], 7, 0x6B901122);
+        d = ff(d, a, b, c, wordArray[i + 13], 12, 0xFD987193);
+        c = ff(c, d, a, b, wordArray[i + 14], 17, 0xA679438E);
+        b = ff(b, c, d, a, wordArray[i + 15], 22, 0x49B40821);
+
+        a = gg(a, b, c, d, wordArray[i + 1], 5, 0xF61E2562);
+        d = gg(d, a, b, c, wordArray[i + 6], 9, 0xC040B340);
+        c = gg(c, d, a, b, wordArray[i + 11], 14, 0x265E5A51);
+        b = gg(b, c, d, a, wordArray[i + 0], 20, 0xE9B6C7AA);
+        a = gg(a, b, c, d, wordArray[i + 5], 5, 0xD62F105D);
+        d = gg(d, a, b, c, wordArray[i + 10], 9, 0x02441453);
+        c = gg(c, d, a, b, wordArray[i + 15], 14, 0xD8A1E681);
+        b = gg(b, c, d, a, wordArray[i + 4], 20, 0xE7D3FBC8);
+        a = gg(a, b, c, d, wordArray[i + 9], 5, 0x21E1CDE6);
+        d = gg(d, a, b, c, wordArray[i + 14], 9, 0xC33707D6);
+        c = gg(c, d, a, b, wordArray[i + 3], 14, 0xF4D50D87);
+        b = gg(b, c, d, a, wordArray[i + 8], 20, 0x455A14ED);
+        a = gg(a, b, c, d, wordArray[i + 13], 5, 0xA9E3E905);
+        d = gg(d, a, b, c, wordArray[i + 2], 9, 0xFCEFA3F8);
+        c = gg(c, d, a, b, wordArray[i + 7], 14, 0x676F02D9);
+        b = gg(b, c, d, a, wordArray[i + 12], 20, 0x8D2A4C8A);
+
+        a = hh(a, b, c, d, wordArray[i + 5], 4, 0xFFFA3942);
+        d = hh(d, a, b, c, wordArray[i + 8], 11, 0x8771F681);
+        c = hh(c, d, a, b, wordArray[i + 11], 16, 0x6D9D6122);
+        b = hh(b, c, d, a, wordArray[i + 14], 23, 0xFDE5380C);
+        a = hh(a, b, c, d, wordArray[i + 1], 4, 0xA4BEEA44);
+        d = hh(d, a, b, c, wordArray[i + 4], 11, 0x4BDECFA9);
+        c = hh(c, d, a, b, wordArray[i + 7], 16, 0xF6BB4B60);
+        b = hh(b, c, d, a, wordArray[i + 10], 23, 0xBEBFBC70);
+        a = hh(a, b, c, d, wordArray[i + 13], 4, 0x289B7EC6);
+        d = hh(d, a, b, c, wordArray[i + 0], 11, 0xEAA127FA);
+        c = hh(c, d, a, b, wordArray[i + 3], 16, 0xD4EF3085);
+        b = hh(b, c, d, a, wordArray[i + 6], 23, 0x04881D05);
+        a = hh(a, b, c, d, wordArray[i + 9], 4, 0xD9D4D039);
+        d = hh(d, a, b, c, wordArray[i + 12], 11, 0xE6DB99E5);
+        c = hh(c, d, a, b, wordArray[i + 15], 16, 0x1FA27CF8);
+        b = hh(b, c, d, a, wordArray[i + 2], 23, 0xC4AC5665);
+
+        a = ii(a, b, c, d, wordArray[i + 0], 6, 0xF4292244);
+        d = ii(d, a, b, c, wordArray[i + 7], 10, 0x432AFF97);
+        c = ii(c, d, a, b, wordArray[i + 14], 15, 0xAB9423A7);
+        b = ii(b, c, d, a, wordArray[i + 5], 21, 0xFC93A039);
+        a = ii(a, b, c, d, wordArray[i + 12], 6, 0x655B59C3);
+        d = ii(d, a, b, c, wordArray[i + 3], 10, 0x8F0CCC92);
+        c = ii(c, d, a, b, wordArray[i + 10], 15, 0xFFEFF47D);
+        b = ii(b, c, d, a, wordArray[i + 1], 21, 0x85845DD1);
+        a = ii(a, b, c, d, wordArray[i + 8], 6, 0x6FA87E4F);
+        d = ii(d, a, b, c, wordArray[i + 15], 10, 0xFE2CE6E0);
+        c = ii(c, d, a, b, wordArray[i + 6], 15, 0xA3014314);
+        b = ii(b, c, d, a, wordArray[i + 13], 21, 0x4E0811A1);
+        a = ii(a, b, c, d, wordArray[i + 4], 6, 0xF7537E82);
+        d = ii(d, a, b, c, wordArray[i + 11], 10, 0xBD3AF235);
+        c = ii(c, d, a, b, wordArray[i + 2], 15, 0x2AD7D2BB);
+        b = ii(b, c, d, a, wordArray[i + 9], 21, 0xEB86D391);
+
+        a = addUnsigned(a, aa);
+        b = addUnsigned(b, bb);
+        c = addUnsigned(c, cc);
+        d = addUnsigned(d, dd);
+    }
+
+    return wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d);
+}
 // Initialize
 connectWebSocket();

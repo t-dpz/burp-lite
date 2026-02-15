@@ -5,13 +5,14 @@ from pydantic import BaseModel
 import subprocess
 import threading
 import requests
-from typing import Dict, List
+from typing import Dict, List, Optional
 import uvicorn
 
 app = FastAPI()
 
 # State management
 intercepted_requests: List[dict] = []
+pending_actions: List[dict] = []  # Queue of forward/drop actions
 history: List[dict] = []
 intercept_enabled = False
 mitmproxy_process = None
@@ -72,6 +73,14 @@ async def new_intercepted_request(req: InterceptRequest):
     
     return {"status": "ok"}
 
+@app.get("/api/intercept/actions")
+async def get_pending_actions():
+    """Called by mitmproxy addon to get pending forward/drop actions"""
+    global pending_actions
+    actions = pending_actions.copy()
+    pending_actions.clear()  # Clear after reading
+    return actions
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -91,7 +100,7 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_clients.remove(websocket)
 
 async def handle_ws_message(data: dict, websocket: WebSocket):
-    global intercept_enabled
+    global intercept_enabled, pending_actions
     msg_type = data.get('type')
     
     if msg_type == 'toggle_intercept':
@@ -111,16 +120,30 @@ async def handle_ws_message(data: dict, websocket: WebSocket):
     
     elif msg_type == 'forward':
         req_id = data.get('id')
-        # Remove from queue
+        modified = data.get('modified')  # Optional modified request
+        
+        # Add to actions queue
+        action = {'id': req_id, 'action': 'forward'}
+        if modified:
+            action['modified'] = modified
+        pending_actions.append(action)
+        
+        # Remove from intercepted queue
         global intercepted_requests
         intercepted_requests = [r for r in intercepted_requests if r['id'] != req_id]
+        
         await websocket.send_json({'type': 'forwarded', 'id': req_id})
         print(f"[FORWARD] Request {req_id}")
     
     elif msg_type == 'drop':
         req_id = data.get('id')
-        # Remove from queue
+        
+        # Add to actions queue
+        pending_actions.append({'id': req_id, 'action': 'drop'})
+        
+        # Remove from intercepted queue
         intercepted_requests = [r for r in intercepted_requests if r['id'] != req_id]
+        
         await websocket.send_json({'type': 'dropped', 'id': req_id})
         print(f"[DROP] Request {req_id}")
 

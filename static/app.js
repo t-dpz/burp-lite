@@ -24,6 +24,14 @@ function handleWebSocketMessage(data) {
     } else if (data.type === 'intercept_status') {
         interceptEnabled = data.enabled;
         updateInterceptButton();
+    } else if (data.type === 'removed') {
+        // Remove from local queue
+        interceptQueue = interceptQueue.filter(r => r.id !== data.id);
+        renderInterceptQueue();
+        if (currentRequest && currentRequest.id === data.id) {
+            currentRequest = null;
+            document.getElementById('interceptRequest').value = '';
+        }
     }
 }
 
@@ -81,10 +89,10 @@ document.getElementById('forwardBtn').addEventListener('click', () => {
             type: 'forward',
             id: currentRequest.id
         }));
-        interceptQueue = interceptQueue.filter(r => r.id !== currentRequest.id);
-        renderInterceptQueue();
-        currentRequest = null;
-        document.getElementById('interceptRequest').value = '';
+        // Don't remove from queue anymore - just deselect
+        document.querySelectorAll('.request-item').forEach(item => {
+            item.classList.remove('selected');
+        });
     }
 });
 
@@ -94,10 +102,19 @@ document.getElementById('dropBtn').addEventListener('click', () => {
             type: 'drop',
             id: currentRequest.id
         }));
-        interceptQueue = interceptQueue.filter(r => r.id !== currentRequest.id);
-        renderInterceptQueue();
-        currentRequest = null;
-        document.getElementById('interceptRequest').value = '';
+        // Don't remove from queue anymore - just deselect
+        document.querySelectorAll('.request-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+    }
+});
+
+document.getElementById('removeBtn').addEventListener('click', () => {
+    if (currentRequest) {
+        ws.send(JSON.stringify({
+            type: 'remove',
+            id: currentRequest.id
+        }));
     }
 });
 
@@ -129,7 +146,7 @@ function parseRequest(text) {
     let body = '';
     let inBody = false;
     let host = '';
-    let scheme = 'http';  // Default to http
+    let scheme = 'http';
 
     for (let i = 1; i < lines.length; i++) {
         if (lines[i].trim() === '') {
@@ -150,13 +167,11 @@ function parseRequest(text) {
 
     // Detect scheme from the first line if it's a full URL
     if (path.startsWith('http://') || path.startsWith('https://')) {
-        // Full URL in request line (proxy-style request)
         const url = path;
         scheme = url.startsWith('https://') ? 'https' : 'http';
         return { method, url, headers, body: body.trim() };
     }
 
-    // Otherwise construct URL from Host header
     const url = `${scheme}://${host}${path}`;
     return { method, url, headers, body: body.trim() };
 }

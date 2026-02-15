@@ -19,7 +19,6 @@
         <div class="tabs">
             <button class="tab active" data-tab="intercept">Intercept</button>
             <button class="tab" data-tab="repeater">Repeater</button>
-            <button class="tab" data-tab="history">History</button>
         </div>
 
         <!-- Intercept Panel -->
@@ -34,6 +33,7 @@
                         <button id="forwardBtn" class="btn btn-success">Forward</button>
                         <button id="dropBtn" class="btn btn-danger">Drop</button>
                         <button id="sendToRepeater" class="btn">Send to Repeater</button>
+                        <button id="removeBtn" class="btn" style="margin-left: auto;">Remove</button>
                     </div>
                     <textarea id="interceptRequest" placeholder="Select a request..."></textarea>
                 </div>
@@ -54,11 +54,6 @@
                     <textarea id="repeaterResponse" readonly></textarea>
                 </div>
             </div>
-        </div>
-
-        <!-- History Panel -->
-        <div id="history" class="panel">
-            <div id="historyList"></div>
         </div>
     </div>
 

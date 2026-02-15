@@ -21,8 +21,7 @@ app = FastAPI()
 
 # State management
 intercepted_requests: List[dict] = []
-pending_actions: List[dict] = []  # Queue of forward/drop actions
-history: List[dict] = []
+pending_actions: List[dict] = []
 intercept_enabled = False
 mitmproxy_process = None
 
@@ -48,13 +47,18 @@ class InterceptRequest(BaseModel):
 async def startup():
     """Start mitmproxy in background"""
     global mitmproxy_process
+    
+    # Open log files
+    stdout_log = open('/tmp/mitmdump.log', 'w')
+    stderr_log = open('/tmp/mitmdump_error.log', 'w')
+    
     thread = threading.Thread(target=start_mitmproxy, daemon=True)
     thread.start()
+    print("[SERVER] mitmproxy started - logs at /tmp/mitmdump.log")
 
 def start_mitmproxy():
     global mitmproxy_process
     
-    # Open log files
     stdout_log = open('/tmp/mitmdump.log', 'w')
     stderr_log = open('/tmp/mitmdump_error.log', 'w')
     
@@ -63,8 +67,6 @@ def start_mitmproxy():
         stdout=stdout_log,
         stderr=stderr_log
     )
-    
-    print("[SERVER] mitmproxy started - logs at /tmp/mitmdump.log")
 
 # API endpoints for mitmproxy addon
 @app.get("/api/intercept/status")
@@ -74,7 +76,7 @@ async def get_intercept_status():
 @app.post("/api/intercept/new")
 async def new_intercepted_request(req: InterceptRequest):
     """Called by mitmproxy addon when a request is intercepted"""
-    req_dict = req.dict()
+    req_dict = req.model_dump()
     intercepted_requests.append(req_dict)
     
     # Notify all WebSocket clients
@@ -94,7 +96,7 @@ async def get_pending_actions():
     """Called by mitmproxy addon to get pending forward/drop actions"""
     global pending_actions
     actions = pending_actions.copy()
-    pending_actions.clear()  # Clear after reading
+    pending_actions.clear()
     return actions
 
 @app.websocket("/ws")
@@ -116,7 +118,7 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_clients.remove(websocket)
 
 async def handle_ws_message(data: dict, websocket: WebSocket):
-    global intercept_enabled, pending_actions
+    global intercept_enabled, pending_actions, intercepted_requests
     msg_type = data.get('type')
     
     if msg_type == 'toggle_intercept':
@@ -136,7 +138,7 @@ async def handle_ws_message(data: dict, websocket: WebSocket):
     
     elif msg_type == 'forward':
         req_id = data.get('id')
-        modified = data.get('modified')  # Optional modified request
+        modified = data.get('modified')
         
         # Add to actions queue
         action = {'id': req_id, 'action': 'forward'}
@@ -144,9 +146,7 @@ async def handle_ws_message(data: dict, websocket: WebSocket):
             action['modified'] = modified
         pending_actions.append(action)
         
-        # Remove from intercepted queue
-        global intercepted_requests
-        intercepted_requests = [r for r in intercepted_requests if r['id'] != req_id]
+        # DON'T remove from intercepted_requests - keep them visible
         
         await websocket.send_json({'type': 'forwarded', 'id': req_id})
         print(f"[FORWARD] Request {req_id}")
@@ -157,11 +157,19 @@ async def handle_ws_message(data: dict, websocket: WebSocket):
         # Add to actions queue
         pending_actions.append({'id': req_id, 'action': 'drop'})
         
-        # Remove from intercepted queue
-        intercepted_requests = [r for r in intercepted_requests if r['id'] != req_id]
+        # DON'T remove from intercepted_requests - keep them visible
         
         await websocket.send_json({'type': 'dropped', 'id': req_id})
         print(f"[DROP] Request {req_id}")
+    
+    elif msg_type == 'remove':
+        req_id = data.get('id')
+        
+        # Remove from intercepted list
+        intercepted_requests = [r for r in intercepted_requests if r['id'] != req_id]
+        
+        await websocket.send_json({'type': 'removed', 'id': req_id})
+        print(f"[REMOVE] Request {req_id}")
 
 @app.post("/api/repeater/send")
 async def send_request(request_data: dict):
@@ -181,24 +189,13 @@ async def send_request(request_data: dict):
             timeout=30
         )
         
-        # Add to history
-        history_item = {
-            'request': request_data,
-            'response': {
-                'status_code': response.status_code,
-                'headers': dict(response.headers),
-                'body': response.text
-            }
+        return {
+            'status_code': response.status_code,
+            'headers': dict(response.headers),
+            'body': response.text
         }
-        history.append(history_item)
-        
-        return history_item['response']
     except Exception as e:
         return {'error': str(e)}
-
-@app.get("/api/history")
-async def get_history():
-    return history
 
 # Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

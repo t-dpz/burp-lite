@@ -124,11 +124,12 @@ document.getElementById('sendRequest').addEventListener('click', async () => {
 
 function parseRequest(text) {
     const lines = text.split('\n');
-    const [method, path] = lines[0].split(' ');
+    const [method, path, protocol] = lines[0].split(' ');
     const headers = {};
     let body = '';
     let inBody = false;
     let host = '';
+    let scheme = 'http';  // Default to http
 
     for (let i = 1; i < lines.length; i++) {
         if (lines[i].trim() === '') {
@@ -147,7 +148,16 @@ function parseRequest(text) {
         }
     }
 
-    const url = `https://${host}${path}`;
+    // Detect scheme from the first line if it's a full URL
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        // Full URL in request line (proxy-style request)
+        const url = path;
+        scheme = url.startsWith('https://') ? 'https' : 'http';
+        return { method, url, headers, body: body.trim() };
+    }
+
+    // Otherwise construct URL from Host header
+    const url = `${scheme}://${host}${path}`;
     return { method, url, headers, body: body.trim() };
 }
 

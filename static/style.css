@@ -1,0 +1,171 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background: #1e1e1e;
+    color: #d4d4d4;
+}
+
+.container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background: #252526;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #ff6b35;
+}
+
+h1 {
+    color: #ff6b35;
+}
+
+.controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.proxy-info {
+    color: #858585;
+    font-size: 0.9rem;
+}
+
+.tabs {
+    background: #2d2d30;
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+
+.tab {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: none;
+    color: #858585;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+    color: #ff6b35;
+    border-bottom-color: #ff6b35;
+}
+
+.panel {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+}
+
+.panel.active {
+    display: flex;
+    flex-direction: column;
+}
+
+.split-view {
+    display: flex;
+    flex: 1;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.request-list,
+.request-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.request-details,
+.response-viewer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+textarea {
+    flex: 1;
+    background: #1e1e1e;
+    border: 1px solid #3e3e42;
+    color: #d4d4d4;
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+    resize: none;
+}
+
+.btn {
+    background: #0e639c;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.btn:hover {
+    background: #1177bb;
+}
+
+.btn-success {
+    background: #107c10;
+}
+
+.btn-danger {
+    background: #e81123;
+}
+
+.btn-primary {
+    background: #ff6b35;
+}
+
+.toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+#interceptQueue {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #3e3e42;
+    padding: 0.5rem;
+}
+
+.request-item {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: #252526;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+}
+
+.request-item:hover {
+    background: #2d2d30;
+}
+
+.request-item.selected {
+    border-left-color: #ff6b35;
+    background: #2d2d30;
+}
+
+#responseStatus {
+    padding: 0.5rem;
+    background: #252526;
+    margin-bottom: 0.5rem;
+    border-radius: 3px;
+}
+
+h3 {
+    margin-bottom: 0.5rem;
+    color: #ff6b35;
+}

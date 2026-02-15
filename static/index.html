@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Burp Lite</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🔥 Burp Lite</h1>
+            <div class="controls">
+                <button id="toggleIntercept" class="btn">Intercept: OFF</button>
+                <span class="proxy-info">Proxy: localhost:8081</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="intercept">Intercept</button>
+            <button class="tab" data-tab="repeater">Repeater</button>
+            <button class="tab" data-tab="history">History</button>
+        </div>
+
+        <!-- Intercept Panel -->
+        <div id="intercept" class="panel active">
+            <div class="split-view">
+                <div class="request-list">
+                    <h3>Intercepted Requests</h3>
+                    <div id="interceptQueue"></div>
+                </div>
+                <div class="request-details">
+                    <div class="toolbar">
+                        <button id="forwardBtn" class="btn btn-success">Forward</button>
+                        <button id="dropBtn" class="btn btn-danger">Drop</button>
+                        <button id="sendToRepeater" class="btn">Send to Repeater</button>
+                    </div>
+                    <textarea id="interceptRequest" placeholder="Select a request..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Repeater Panel -->
+        <div id="repeater" class="panel">
+            <div class="split-view">
+                <div class="request-editor">
+                    <h3>Request</h3>
+                    <textarea id="repeaterRequest" placeholder="Paste request here..."></textarea>
+                    <button id="sendRequest" class="btn btn-primary">Send</button>
+                </div>
+                <div class="response-viewer">
+                    <h3>Response</h3>
+                    <div id="responseStatus"></div>
+                    <textarea id="repeaterResponse" readonly></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Panel -->
+        <div id="history" class="panel">
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

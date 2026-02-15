@@ -2,9 +2,7 @@
 
 A lightweight, modern, web-based HTTP proxy and penetration testing toolkit built for HackTheBox adventures and security research. Burp Lite brings the power of Burp Suite's essential features into a sleek, browser-based interface with zero Java dependencies.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.9+-green.svg)
-![Status](https://img.shields.io/badge/status-production_ready-success.svg)
 ![Made For](https://img.shields.io/badge/made_for-HackTheBox-orange.svg)
 
 
@@ -16,14 +14,13 @@ A lightweight, modern, web-based HTTP proxy and penetration testing toolkit buil
 - **Scope Management** - Filter traffic with wildcard patterns and file extension rules
 - **Search & Filter** - Instantly find requests by URL, method, headers, or body content
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [mitmproxy](https://mitmproxy.org/) - Powerful Python proxy framework
 - [FastAPI](https://fastapi.tiangolo.com/) - Modern, fast web framework
 - Inspired by [Burp Suite](https://portswigger.net/burp) and [OWASP ZAP](https://www.zaproxy.org/)
-- Built with ❤️ for the HackTheBox community
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This tool is intended for authorized security testing and educational purposes only. Always obtain proper authorization before testing any systems you don't own. The authors are not responsible for misuse or damage caused by this tool.
 

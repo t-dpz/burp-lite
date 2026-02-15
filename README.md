@@ -10,7 +10,7 @@
 - Python 3.9+
 - pip or pipx
 
-## 🛠️ Project Structure
+## Project Structure
 ```
 burp-lite/
 ├── server.py              # FastAPI backend server

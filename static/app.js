@@ -483,17 +483,52 @@ document.querySelectorAll('.export-option').forEach(option => {
                 break;
         }
 
-        navigator.clipboard.writeText(exported).then(() => {
+        // Fallback clipboard copy for non-HTTPS contexts
+        copyToClipboard(exported).then(() => {
             const originalText = option.textContent;
             option.textContent = '✓ Copied!';
             setTimeout(() => {
                 option.textContent = originalText;
             }, 2000);
+        }).catch(() => {
+            // If copy fails, show the text in an alert as last resort
+            prompt('Copy this code:', exported);
         });
 
         document.getElementById('exportMenu').classList.remove('show');
     });
 });
+
+// Universal clipboard copy function
+function copyToClipboard(text) {
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+    }
+
+    // Fallback for non-secure contexts
+    return new Promise((resolve, reject) => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            if (successful) {
+                resolve();
+            } else {
+                reject();
+            }
+        } catch (err) {
+            document.body.removeChild(textarea);
+            reject(err);
+        }
+    });
+}
 
 function exportToCurl(req) {
     let curl = `curl -X ${req.method} '${req.url}'`;
@@ -660,17 +695,20 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
 
 document.getElementById('copyOutput').addEventListener('click', () => {
     const output = document.getElementById('encoderOutput');
-    output.select();
-    document.execCommand('copy');
 
-    const btn = document.getElementById('copyOutput');
-    const originalText = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(() => {
-        btn.textContent = originalText;
-    }, 1500);
+    copyToClipboard(output.value).then(() => {
+        const btn = document.getElementById('copyOutput');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 1500);
+    }).catch(() => {
+        // Select the text as fallback
+        output.select();
+        alert('Please manually copy the selected text (Ctrl+C)');
+    });
 });
-
 // JWT Decoder
 function decodeJWT(token) {
     const parts = token.split('.');

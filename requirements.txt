@@ -1,0 +1,18 @@
+# Core proxy functionality
+mitmproxy>=10.0.0
+
+# Web framework and server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# WebSocket support
+websockets>=12.0
+
+# Async file operations
+aiofiles>=23.0.0
+
+# HTTP requests for repeater/intruder
+requests>=2.31.0
+
+# Optional: for better performance
+python-multipart>=0.0.6

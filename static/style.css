@@ -986,8 +986,12 @@ textarea:focus {
     }
 }
 
-.white {
-    color: white;
+h1 .white {
+    color: var(--text-secondary);
+    -webkit-text-fill-color: var(--text-secondary);
+    background: none;
+    font-weight: 400;
+    font-size: 1rem;
 }
 
 /* No results message */

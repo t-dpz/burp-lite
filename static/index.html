@@ -27,8 +27,21 @@
         <div id="intercept" class="panel active">
             <div class="split-view">
                 <div class="request-list">
-                    <h3>Intercepted Requests</h3>
+                    <div class="list-header">
+                        <h3>Intercepted Requests</h3>
+                        <div class="search-bar">
+                            <input type="text" id="searchInput" placeholder="🔍 Search URL, host, method...">
+                            <div class="filter-chips">
+                                <button class="filter-chip active" data-method="all">All</button>
+                                <button class="filter-chip" data-method="GET">GET</button>
+                                <button class="filter-chip" data-method="POST">POST</button>
+                                <button class="filter-chip" data-method="PUT">PUT</button>
+                                <button class="filter-chip" data-method="DELETE">DEL</button>
+                            </div>
+                        </div>
+                    </div>
                     <div id="interceptQueue"></div>
+                    <div id="queueStats"></div>
                 </div>
                 <div class="request-details">
                     <div class="toolbar">

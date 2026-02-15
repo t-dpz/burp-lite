@@ -2,6 +2,8 @@ let ws;
 let interceptEnabled = false;
 let currentRequest = null;
 let interceptQueue = [];
+let searchQuery = '';
+let methodFilter = 'all';
 
 // WebSocket connection
 function connectWebSocket() {
@@ -19,13 +21,17 @@ function connectWebSocket() {
 
 function handleWebSocketMessage(data) {
     if (data.type === 'intercepted') {
+        // Check scope before adding
+        if (!isInScope(data.data.url)) {
+            console.log('[SCOPE] Filtered out:', data.data.url);
+            return;
+        }
         interceptQueue.push(data.data);
         renderInterceptQueue();
     } else if (data.type === 'intercept_status') {
         interceptEnabled = data.enabled;
         updateInterceptButton();
     } else if (data.type === 'removed') {
-        // Remove from local queue
         interceptQueue = interceptQueue.filter(r => r.id !== data.id);
         renderInterceptQueue();
         if (currentRequest && currentRequest.id === data.id) {
@@ -35,15 +41,87 @@ function handleWebSocketMessage(data) {
     }
 }
 
+// Filter and search functions
+function matchesSearch(req) {
+    if (!searchQuery) return true;
+
+    const query = searchQuery.toLowerCase();
+    const searchableText = [
+        req.method,
+        req.url,
+        req.host,
+        req.path,
+        req.body,
+        ...Object.keys(req.headers),
+        ...Object.values(req.headers)
+    ].join(' ').toLowerCase();
+
+    return searchableText.includes(query);
+}
+
+function matchesMethodFilter(req) {
+    if (methodFilter === 'all') return true;
+    return req.method === methodFilter;
+}
+
+function getFilteredQueue() {
+    return interceptQueue.filter(req =>
+        matchesSearch(req) && matchesMethodFilter(req)
+    );
+}
+
 // UI Functions
 function renderInterceptQueue() {
     const queue = document.getElementById('interceptQueue');
-    queue.innerHTML = interceptQueue.map((req, idx) => `
-        <div class="request-item" onclick="selectRequest(${idx})">
-            <strong>${req.method}</strong> ${req.url}
-            <div style="font-size:0.8em;color:#858585">${req.timestamp}</div>
-        </div>
-    `).join('');
+    const stats = document.getElementById('queueStats');
+    const filtered = getFilteredQueue();
+
+    if (filtered.length === 0) {
+        if (interceptQueue.length === 0) {
+            queue.innerHTML = '<div class="no-results">No requests intercepted yet</div>';
+        } else {
+            queue.innerHTML = '<div class="no-results">No requests match your filters</div>';
+        }
+        stats.innerHTML = '';
+        return;
+    }
+
+    queue.innerHTML = filtered.map((req, idx) => {
+        const originalIdx = interceptQueue.indexOf(req);
+        return `
+            <div class="request-item" onclick="selectRequest(${originalIdx})">
+                <strong>${req.method}</strong> ${highlightMatch(req.url)}
+                <div style="font-size:0.8em;color:#858585">${req.timestamp}</div>
+            </div>
+        `;
+    }).join('');
+
+    // Update stats
+    const methodCounts = {};
+    interceptQueue.forEach(req => {
+        methodCounts[req.method] = (methodCounts[req.method] || 0) + 1;
+    });
+
+    const methodStats = Object.entries(methodCounts)
+        .map(([method, count]) => `${method}: ${count}`)
+        .join(' | ');
+
+    if (filtered.length === interceptQueue.length) {
+        stats.innerHTML = `<span class="highlight">${interceptQueue.length}</span> requests | ${methodStats}`;
+    } else {
+        stats.innerHTML = `Showing <span class="highlight">${filtered.length}</span> of <span class="highlight">${interceptQueue.length}</span> | ${methodStats}`;
+    }
+}
+
+function highlightMatch(text) {
+    if (!searchQuery) return text;
+
+    const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi');
+    return text.replace(regex, '<mark style="background: var(--accent-primary); color: white; padding: 0 0.25rem; border-radius: 2px;">$1</mark>');
+}
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function selectRequest(idx) {
@@ -52,7 +130,9 @@ function selectRequest(idx) {
     document.getElementById('interceptRequest').value = requestText;
 
     document.querySelectorAll('.request-item').forEach((item, i) => {
-        item.classList.toggle('selected', i === idx);
+        const filtered = getFilteredQueue();
+        const originalIdx = interceptQueue.indexOf(filtered[i]);
+        item.classList.toggle('selected', originalIdx === idx);
     });
 }
 
@@ -74,6 +154,25 @@ function updateInterceptButton() {
     btn.style.background = interceptEnabled ? '#107c10' : '#0e639c';
 }
 
+// Search input handler
+document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    renderInterceptQueue();
+});
+
+// Method filter handlers
+document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        methodFilter = chip.dataset.method;
+
+        // Update active state
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+
+        renderInterceptQueue();
+    });
+});
+
 // Event Listeners
 document.getElementById('toggleIntercept').addEventListener('click', () => {
     interceptEnabled = !interceptEnabled;
@@ -89,7 +188,6 @@ document.getElementById('forwardBtn').addEventListener('click', () => {
             type: 'forward',
             id: currentRequest.id
         }));
-        // Don't remove from queue anymore - just deselect
         document.querySelectorAll('.request-item').forEach(item => {
             item.classList.remove('selected');
         });
@@ -102,7 +200,6 @@ document.getElementById('dropBtn').addEventListener('click', () => {
             type: 'drop',
             id: currentRequest.id
         }));
-        // Don't remove from queue anymore - just deselect
         document.querySelectorAll('.request-item').forEach(item => {
             item.classList.remove('selected');
         });

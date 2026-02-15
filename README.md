@@ -1,4 +1,4 @@
-# 💀 Burp Lite by -=tdpz=-
+# 💀 BurpLite by -=tdpz=-
 
 A lightweight web-based HTTP proxy and penetration testing toolkit built for HackTheBox fun and security research. 
 

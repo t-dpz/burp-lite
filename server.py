@@ -1,21 +1,17 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 import subprocess
 import threading
 import requests
 from typing import Dict, List
 import uvicorn
-import asyncio
-import json
-import os
 
 app = FastAPI()
 
-INTERCEPT_QUEUE_FILE = '/tmp/burp_lite_queue.json'
-INTERCEPT_STATE_FILE = '/tmp/burp_lite_state.json'
-
 # State management
+intercepted_requests: List[dict] = []
 history: List[dict] = []
 intercept_enabled = False
 mitmproxy_process = None
@@ -23,49 +19,27 @@ mitmproxy_process = None
 # WebSocket connections
 ws_clients: List[WebSocket] = []
 
-# Background task to poll queue
-async def poll_intercept_queue():
-    """Poll the queue file and notify WebSocket clients"""
-    last_queue_size = 0
-    while True:
-        try:
-            if os.path.exists(INTERCEPT_QUEUE_FILE):
-                with open(INTERCEPT_QUEUE_FILE, 'r') as f:
-                    queue = json.load(f)
-                
-                # If new items were added, notify clients
-                if len(queue) > last_queue_size:
-                    new_items = queue[last_queue_size:]
-                    for item in new_items:
-                        for client in ws_clients:
-                            try:
-                                await client.send_json({
-                                    'type': 'intercepted',
-                                    'data': item
-                                })
-                            except:
-                                pass
-                    last_queue_size = len(queue)
-        except Exception as e:
-            print(f"[POLL ERROR] {e}")
-        
-        await asyncio.sleep(0.5)  # Poll every 500ms
+class InterceptStatus(BaseModel):
+    enabled: bool
+
+class InterceptRequest(BaseModel):
+    id: str
+    method: str
+    url: str
+    host: str
+    path: str
+    headers: dict
+    body: str
+    scheme: str
+    port: int
+    timestamp: str
 
 @app.on_event("startup")
 async def startup():
-    """Start mitmproxy in background and polling task"""
+    """Start mitmproxy in background"""
     global mitmproxy_process
-    
-    # Clear queue on startup
-    if os.path.exists(INTERCEPT_QUEUE_FILE):
-        os.remove(INTERCEPT_QUEUE_FILE)
-    
-    # Start mitmproxy
     thread = threading.Thread(target=start_mitmproxy, daemon=True)
     thread.start()
-    
-    # Start polling task
-    asyncio.create_task(poll_intercept_queue())
 
 def start_mitmproxy():
     global mitmproxy_process
@@ -75,21 +49,39 @@ def start_mitmproxy():
         stderr=subprocess.PIPE
     )
 
+# API endpoints for mitmproxy addon
+@app.get("/api/intercept/status")
+async def get_intercept_status():
+    return {"enabled": intercept_enabled}
+
+@app.post("/api/intercept/new")
+async def new_intercepted_request(req: InterceptRequest):
+    """Called by mitmproxy addon when a request is intercepted"""
+    req_dict = req.dict()
+    intercepted_requests.append(req_dict)
+    
+    # Notify all WebSocket clients
+    for client in ws_clients:
+        try:
+            await client.send_json({
+                'type': 'intercepted',
+                'data': req_dict
+            })
+        except:
+            pass
+    
+    return {"status": "ok"}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     ws_clients.append(websocket)
     
-    # Send current intercept state
-    try:
-        with open(INTERCEPT_STATE_FILE, 'r') as f:
-            state = json.load(f)
-        await websocket.send_json({
-            'type': 'intercept_status',
-            'enabled': state.get('enabled', False)
-        })
-    except:
-        pass
+    # Send current status
+    await websocket.send_json({
+        'type': 'intercept_status',
+        'enabled': intercept_enabled
+    })
     
     try:
         while True:
@@ -99,54 +91,36 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_clients.remove(websocket)
 
 async def handle_ws_message(data: dict, websocket: WebSocket):
+    global intercept_enabled
     msg_type = data.get('type')
     
     if msg_type == 'toggle_intercept':
-        enabled = data.get('enabled', False)
-        
-        # Write to state file
-        with open(INTERCEPT_STATE_FILE, 'w') as f:
-            json.dump({'enabled': enabled}, f)
+        intercept_enabled = data.get('enabled', False)
         
         # Notify all clients
         for client in ws_clients:
             try:
                 await client.send_json({
                     'type': 'intercept_status',
-                    'enabled': enabled
+                    'enabled': intercept_enabled
                 })
             except:
                 pass
         
-        print(f"[INTERCEPT] Toggled to: {enabled}")
+        print(f"[INTERCEPT] Toggled to: {intercept_enabled}")
     
     elif msg_type == 'forward':
         req_id = data.get('id')
         # Remove from queue
-        try:
-            with open(INTERCEPT_QUEUE_FILE, 'r') as f:
-                queue = json.load(f)
-            queue = [q for q in queue if q['id'] != req_id]
-            with open(INTERCEPT_QUEUE_FILE, 'w') as f:
-                json.dump(queue, f)
-        except:
-            pass
-        
+        global intercepted_requests
+        intercepted_requests = [r for r in intercepted_requests if r['id'] != req_id]
         await websocket.send_json({'type': 'forwarded', 'id': req_id})
         print(f"[FORWARD] Request {req_id}")
     
     elif msg_type == 'drop':
         req_id = data.get('id')
         # Remove from queue
-        try:
-            with open(INTERCEPT_QUEUE_FILE, 'r') as f:
-                queue = json.load(f)
-            queue = [q for q in queue if q['id'] != req_id]
-            with open(INTERCEPT_QUEUE_FILE, 'w') as f:
-                json.dump(queue, f)
-        except:
-            pass
-        
+        intercepted_requests = [r for r in intercepted_requests if r['id'] != req_id]
         await websocket.send_json({'type': 'dropped', 'id': req_id})
         print(f"[DROP] Request {req_id}")
 

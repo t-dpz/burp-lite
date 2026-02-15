@@ -7,6 +7,15 @@ import threading
 import requests
 from typing import Dict, List, Optional
 import uvicorn
+import logging
+
+# Filter out the noisy polling endpoint
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("/api/intercept/actions") == -1
+
+# Add filter to uvicorn access logger
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 app = FastAPI()
 

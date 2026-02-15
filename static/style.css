@@ -75,7 +75,7 @@ h1 {
 }
 
 h1::before {
-    content: '🔥';
+    content: '💀';
     -webkit-text-fill-color: initial;
 }
 

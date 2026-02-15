@@ -13,13 +13,13 @@ class BurpLiteAddon:
         self.pending = {}
         
         # Start background thread to poll for actions
-        self.running = True
+        self.should_poll = True  # Renamed from self.running
         self.poll_thread = threading.Thread(target=self._poll_actions, daemon=True)
         self.poll_thread.start()
         
     def _poll_actions(self):
         """Poll server for forward/drop actions"""
-        while self.running:
+        while self.should_poll:
             try:
                 resp = requests.get(f"{API_URL}/actions", timeout=1)
                 actions = resp.json()

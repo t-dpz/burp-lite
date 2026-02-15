@@ -15,9 +15,12 @@ class BurpLiteAddon:
         
         # Check intercept status
         try:
+            print(f">>> Checking intercept status at {API_URL}/status")
             resp = requests.get(f"{API_URL}/status", timeout=0.5)
             self.intercept_enabled = resp.json().get('enabled', False)
-        except:
+            print(f">>> Intercept enabled: {self.intercept_enabled}")
+        except Exception as e:
+            print(f">>> ERROR checking status: {e}")
             pass
         
         if self.intercept_enabled:
@@ -36,6 +39,7 @@ class BurpLiteAddon:
             
             # Notify the server
             try:
+                print(f">>> Posting to {API_URL}/new")
                 requests.post(f"{API_URL}/new", json=req_data, timeout=1)
                 print(f">>> INTERCEPTED: {flow.request.method} {flow.request.pretty_url}")
                 self.pending[str(id(flow))] = flow

@@ -28,7 +28,7 @@ async def startup():
 def start_mitmproxy():
     global mitmproxy_process
     mitmproxy_process = subprocess.Popen(
-        ['mitmdump', '-s', 'proxy_addon.py', '-p', '8081'],
+        ['mitmdump', '-s', 'proxy_addon.py', '-p', '8081', '--listen-host', '0.0.0.0'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )

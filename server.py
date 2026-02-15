@@ -53,11 +53,18 @@ async def startup():
 
 def start_mitmproxy():
     global mitmproxy_process
+    
+    # Open log files
+    stdout_log = open('/tmp/mitmdump.log', 'w')
+    stderr_log = open('/tmp/mitmdump_error.log', 'w')
+    
     mitmproxy_process = subprocess.Popen(
         ['mitmdump', '-s', 'proxy_addon.py', '-p', '8081', '--listen-host', '0.0.0.0'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stdout=stdout_log,
+        stderr=stderr_log
     )
+    
+    print("[SERVER] mitmproxy started - logs at /tmp/mitmdump.log")
 
 # API endpoints for mitmproxy addon
 @app.get("/api/intercept/status")

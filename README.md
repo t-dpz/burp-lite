@@ -1,6 +1,6 @@
 # 💀 Burp Lite by -=tdpz=-
 
-A lightweight, modern, web-based HTTP proxy and penetration testing toolkit built for HackTheBox adventures and security research. Burp Lite brings the power of Burp Suite's essential features into a sleek, browser-based interface with zero Java dependencies.
+A lightweight web-based HTTP proxy and penetration testing toolkit built for HackTheBox adventures and security research based on Burp Suite
 
 ![Python](https://img.shields.io/badge/python-3.9+-green.svg)
 ![Made For](https://img.shields.io/badge/made_for-HackTheBox-orange.svg)
